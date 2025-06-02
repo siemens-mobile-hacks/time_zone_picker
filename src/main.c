@@ -120,7 +120,7 @@ static const struct {
 };
 
 void UpdateCSMname(void) {
-    wsprintf((WSHDR *)&MAINCSM.maincsm_name, "%s", "TimeZonePicker");
+    wsprintf((WSHDR *)&MAINCSM.maincsm_name, "%s", "Time zones");
 }
 
 int main() {
