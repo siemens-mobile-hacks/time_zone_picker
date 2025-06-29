@@ -108,15 +108,15 @@ static const struct {
         sizeof(MAIN_CSM),
         1,
         &minus11
-},
-{
+    },
+    {
     maincsm_name_body,
     NAMECSM_MAGIC1,
     NAMECSM_MAGIC2,
     0x0,
     139,
     0
-}
+    }
 };
 
 void UpdateCSMname(void) {

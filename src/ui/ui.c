@@ -4,25 +4,22 @@
 #include <stdlib.h>
 #include "../tz.h"
 #include "../world_clock.h"
+#include "icons.h"
 
 typedef struct {
     TZ_EXTENDED **pools;
     int pools_size;
     int current_city;
 
+    WIDGET *menu;
     int pool_size;
     int pool_id;
     int city_id;
-    int menu_offset;
-    int allow_scroll_up;
-    int allow_scroll_down;
-
-    int timer_time;
 } UI_DATA;
 
-static int ICON[] = {1644};
+#define MENU_WIDGET_ID 20
 
-static HEADER_DESC HEADER_D = {{0, 0, 0, 0}, ICON, (int)"Time zones", (int)LGP_NULL};
+GUI_METHODS METHODS;
 
 const int SOFTKEYS[] = {SET_LEFT_SOFTKEY, SET_MIDDLE_SOFTKEY, SET_RIGHT_SOFTKEY};
 
@@ -51,13 +48,14 @@ int GetPoolSize(const TZ_EXTENDED *pool) {
     return size;
 }
 
-static void OnRedraw(void *) {
+static void OnRedraw(GUI *gui) {
+    WIDGET *menu = GetDataOfItemByID(gui, MENU_WIDGET_ID);
+    menu->methods->onRedraw(menu);
+
     TDate date;
     TTime time;
-    void *gui = GetTopGUI();
     UI_DATA *data = TViewGetUserPointer(gui);
     GetDateTime(&date, &time);
-
 
     WSHDR ws, ws2;
     char str[128];
@@ -65,19 +63,18 @@ static void OnRedraw(void *) {
     CreateLocalWS(&ws, wsbody, 128);
     CreateLocalWS(&ws2, wsbody2, 128);
 
-    const RECT *main_area_rect = GetMainAreaRECT();
     const TZ_EXTENDED *tz = &(data->pools[data->pool_id][data->city_id]);
 
     int x = 0, x2 = 0;
-    int y = main_area_rect->y, y2 = 0;
+    int y = YDISP, y2 = 0;
     int x_bg = -240 + 60 + (data->pool_id * -1) * 5;
     int x_bg2 = 60 + (data->pool_id * -1) * 5;
     int x_bg3 = 60 + 240 + (data->pool_id * -1) * 5;
-    DrawImg(x_bg, y, 1606);
-    DrawImg(x_bg2, y, 1606);
-    DrawImg(x_bg3, y, 1606);
+    DrawImg(x_bg, y, ICON_MAP);
+    DrawImg(x_bg2, y, ICON_MAP);
+    DrawImg(x_bg3, y, ICON_MAP);
 
-    int pic = 1607 + data->pool_id;
+    int pic = ICON_MAP + 1 + data->pool_id;
     if (data->pool_id == 0) {
         x = x_bg;
     } else {
@@ -85,8 +82,8 @@ static void OnRedraw(void *) {
     }
     DrawImg(x, y, pic);
 
-    x = 0; x2 = ScreenW() - 1;
-    y += GetImgHeight(1606); y2 = y + GetFontYSIZE(FONT_SMALL) + 1;
+    x = gui->canvas->x; x2 = gui->canvas->x2;
+    y += GetImgHeight(ICON_MAP); y2 = y + GetFontYSIZE(FONT_SMALL) + 1;
     DrawRectangle(x, y, x2, y2, 0,
                  GetPaletteAdrByColorIndex(PC_FOREGROUND), GetPaletteAdrByColorIndex(PC_FOREGROUND));
 
@@ -101,37 +98,13 @@ static void OnRedraw(void *) {
     DrawString(&ws, x, y, x2, y2, FONT_SMALL, 0,
            GetPaletteAdrByColorIndex(PC_BACKGROUND), GetPaletteAdrByColorIndex(0x17));
 
-    y = y2 + 3;
-    y2 = y + GetFontYSIZE(FONT_SMALL);
-    for (int i = data->menu_offset; i < data->pool_size; i++) {
-        tz = &(data->pools[data->pool_id][i]);
-
-        if (i == data->city_id) {
-            DrawRectangle(0, y, ScreenW() - 1, y2 + 1, RECT_DOT_OUTLINE,
-                         GetPaletteAdrByColorIndex(PC_FOREGROUND), GetPaletteAdrByColorIndex(0x23));
-        }
-        wsprintf(&ws, "%t%c%c", tz->tz.lgp_id, UTF16_ALIGN_RIGHT, UTF16_ALIGN_NONE);
-        if (tz->tz.city_id == data->current_city) {
-            wsInsertChar(&ws, UTF16_FONT_SMALL_BOLD, 1);
-            wsInsertChar(&ws, UTF16_FONT_RESET, wstrlen(&ws));
-        }
-        if (IsSummerTime(tz->id)) {
-            wsInsertChar(&ws, 0xE465, wstrlen(&ws));
-        }
-        DrawString(&ws, x, y + 1, x2, y2, FONT_SMALL, 0,
-                    GetPaletteAdrByColorIndex(PC_FOREGROUND), GetPaletteAdrByColorIndex(0x17));
-        y += GetFontYSIZE(FONT_SMALL) + 3;
-        y2 += GetFontYSIZE(FONT_SMALL) + 3;
+    TVIEW_DESC *desc = gui->definition;
+    if (desc->global_hook_proc) {
+        desc->global_hook_proc(gui, TI_CMD_REDRAW);
     }
-}
-
-void SetScrollFlags(UI_DATA *data) {
-    if (data->pool_size >= 3) {
-        data->allow_scroll_up = ((data->menu_offset && data->city_id - 1 < data->menu_offset) || data->city_id <= 0) ? 1 : 0;
-        data->allow_scroll_down = (data->city_id >= 2 && data->city_id - 1 > data->menu_offset) ? 1 : 0;
-    } else {
-        data->allow_scroll_up = 0;
-        data->allow_scroll_down = 0;
+    WIDGET *softkeys = GetDataOfItemByID(gui, 0);
+    if (softkeys) {
+        softkeys->methods->onRedraw(softkeys);
     }
 }
 
@@ -148,11 +121,11 @@ static int OnKey(GUI *gui, GUI_MSG *msg) {
         WriteCurrentCity(data->current_city);
 
         WSHDR ws;
-        char message[32];
-        uint16_t wsbody[32];
-        CreateLocalWS(&ws, wsbody, 32);
+        char message[64];
+        uint16_t wsbody[64];
+        CreateLocalWS(&ws, wsbody, 61);
         wsprintf(&ws, "Time zone set to: %t", tz->tz.lgp_id);
-        ws_2str(&ws, message, 31);
+        ws_2str(&ws, message, 63);
         ShowMSG(1, (int)message);
     }
     else if (msg->gbsmsg->msg == KEY_DOWN || msg->gbsmsg->msg == LONG_PRESS) {
@@ -162,7 +135,9 @@ static int OnKey(GUI *gui, GUI_MSG *msg) {
                 data->pool_id = data->pools_size - 1;
             }
             data->city_id = 0;
-            data->menu_offset = 0;
+            data->pool_size = GetPoolSize(data->pools[data->pool_id]);
+            SetCursorToMenuItem(data->menu, data->city_id);
+            Menu_SetItemCountDyn(data->menu, data->pool_size);
             DirectRedrawGUI();
         } else if (msg->gbsmsg->submess == RIGHT_BUTTON) {
             data->pool_id++;
@@ -170,67 +145,33 @@ static int OnKey(GUI *gui, GUI_MSG *msg) {
                 data->pool_id = 0;
             }
             data->city_id = 0;
-            data->menu_offset = 0;
+            data->pool_size = GetPoolSize(data->pools[data->pool_id]);
+            SetCursorToMenuItem(data->menu, data->city_id);
+            Menu_SetItemCountDyn(data->menu, data->pool_size);
             DirectRedrawGUI();
         } else if (msg->gbsmsg->submess == UP_BUTTON) {
-            data->city_id--;
-            if (data->allow_scroll_up) {
-                data->menu_offset--;
-            }
+            data->city_id = GetCurMenuItem(data->menu) - 1;
             if (data->city_id < 0) {
                 data->city_id = data->pool_size - 1;
-                if (data->allow_scroll_up) {
-                    data->menu_offset = data->pool_size - 3;
-                }
             }
-            DirectRedrawGUI();
+            SetCursorToMenuItem(data->menu, data->city_id);
+            RefreshGUI();
         } else if (msg->gbsmsg->submess == DOWN_BUTTON) {
-            data->city_id++;
-            if (data->allow_scroll_down) {
-                data->menu_offset++;
-            }
+            data->city_id = GetCurMenuItem(data->menu) + 1;
             if (data->pools[data->pool_id][data->city_id].id == -1) {
                 data->city_id = 0;
-                data->menu_offset = 0;
             }
-            DirectRedrawGUI();
+            SetCursorToMenuItem(data->menu, data->city_id);
+            RefreshGUI();
         }
     }
     return -1;
 }
 
-void *UpdateHeader(GUI *gui) {
-    TTime time;
-    void *header = GetHeaderPointer(gui);
-    WSHDR *ws = AllocWS(32);
-    GetDateTime(NULL, &time);
-    GetTime_ws(ws, &time, 0x227);
-    SetHeaderText(header, ws, malloc_adr(), mfree_adr());
-    return header;
-}
-
-void UpdateHeaderProc(void *gui) {
-    UI_DATA *data = TViewGetUserPointer(gui);
-    void *header = UpdateHeader(gui);
-    GUI_METHODS **m = GetDataOfItemByID(gui, 2);
-    m[1]->onRedraw(header);
-    GUI_StartTimerProc(gui, data->timer_time, 1000, UpdateHeaderProc);
-}
-
 static void GHook(GUI *gui, int cmd) {
     UI_DATA *data = TViewGetUserPointer(gui);
 
-    if (cmd == TI_CMD_REDRAW) {
-        data->pool_size = GetPoolSize(data->pools[data->pool_id]);
-        SetScrollFlags(data);
-        UpdateHeader(gui);
-    } else if (cmd == TI_CMD_CREATE) {
-        static GUI_METHODS gui_methods;
-        void **m = GetDataOfItemByID(gui, 4);
-        memcpy(&gui_methods, m[1], sizeof(GUI_METHODS));
-        gui_methods.onRedraw = (void*)(GUI*)OnRedraw;
-        m[1] = &gui_methods;
-
+    if (cmd == TI_CMD_CREATE) {
         for (int i = 0; i < data->pools_size; i++) {
             for (int j = 0 ; j < GetPoolSize(data->pools[i]); j++) {
                 if (data->pools[i][j].tz.city_id == data->current_city) {
@@ -240,19 +181,30 @@ static void GHook(GUI *gui, int cmd) {
                 }
             }
         }
-
         data->pool_size = GetPoolSize(data->pools[data->pool_id]);
-        if (data->city_id >= 2) {
-            data->menu_offset = (data->city_id < data->pool_size - 1) ? data->city_id - 1 : data->pool_size - 3;
-        }
-    } else if (cmd == TI_CMD_FOCUS) {
-        data->timer_time = GUI_NewTimer(gui);
-        GUI_StartTimerProc(gui, data->timer_time, 1000, UpdateHeaderProc);
-    } else if (cmd == TI_CMD_UNFOCUS) {
-        GUI_DeleteTimer(gui, data->timer_time);
+        Menu_SetItemCountDyn(data->menu, data->pool_size);
+        SetCursorToMenuItem(data->menu, data->city_id);
     } else if (cmd == TI_CMD_DESTROY) {
-        GUI_DeleteTimer(gui, data->timer_time);
+        mfree(data);
     }
+}
+
+void ItemProc(void *gui, int item_n, void *user_pointer) {
+    UI_DATA *data = user_pointer;
+
+    static int icons_checked[] = {ICON_RADIO_CHECKED, 0};
+    static int icons_unchecked[] = {ICON_RADIO_UNCHECKED, 0};
+    TZ_EXTENDED *tz = &(data->pools[data->pool_id][item_n]);
+
+    void *item = AllocMenuItem(gui);
+    WSHDR *ws = AllocMenuWS(gui, 128);
+    SetMenuItemIconArray(gui, item, (tz->tz.city_id == data->current_city) ? icons_checked : icons_unchecked);
+    SetMenuItemIcon(gui, item_n, 0);
+    wsprintf(ws, "%t", tz->tz.lgp_id);
+    if (IsSummerTime(tz->id)) {
+        wstrcatprintf(ws, " %c%c%c%c%c", UTF16_ALIGN_RIGHT, UTF16_FONT_SMALL, 0xE465, UTF16_FONT_RESET, UTF16_ALIGN_NONE);
+    }
+    SetMenuItemText(gui, item, ws, item_n);
 }
 
 static TVIEW_DESC TVIEW_D = {
@@ -271,9 +223,27 @@ static TVIEW_DESC TVIEW_D = {
 };
 
 
+static MENU_DESC MENU_D = {
+    0,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    MENU_FLAGS_ENABLE_ICONS,
+    ItemProc,
+    NULL,
+    NULL,
+    0,
+};
+
 int CreateUI(TZ_EXTENDED **pools, int pools_size, int current_city) {
-    memcpy(&(HEADER_D.rc), GetHeaderRECT(), sizeof(RECT));
-    memcpy(&(TVIEW_D.rc), GetMainAreaRECT(), sizeof(RECT));
+    RECT *main_area_rect = GetMainAreaRECT();
+
+    memcpy(&(TVIEW_D.rc), main_area_rect, sizeof(RECT));
+
+    void *ma = malloc_adr();
+    void *mf = mfree_adr();
 
     UI_DATA *data = malloc(sizeof(UI_DATA));
     zeromem(data, sizeof(UI_DATA));
@@ -281,13 +251,24 @@ int CreateUI(TZ_EXTENDED **pools, int pools_size, int current_city) {
     data->pools_size = pools_size;
     data->current_city = current_city;
 
-    void *gui = TViewGetGUI(malloc_adr(), mfree_adr());
+    GUI *gui = TViewGetGUI(ma, mf);
     TViewSetDefinition(gui, &TVIEW_D);
-    SetHeaderToMenu(gui, &HEADER_D, malloc_adr());
 
     WSHDR *ws = AllocWS(1);
-    TViewSetText(gui, ws, malloc_adr(), mfree_adr());
+    TViewSetText(gui, ws, ma, mf);
     TViewSetUserPointer(gui, data);
+
+    data->menu = GetMenuGUI(ma, mf);
+    SetMenuToGUI(data->menu, &MENU_D);
+    int y = YDISP + GetImgHeight(ICON_MAP) + GetFontYSIZE(FONT_SMALL);
+    SetMenuRect(data->menu, main_area_rect->x, y + GetFontYSIZE(FONT_MEDIUM) / 3,
+                main_area_rect->x2, y - GetFontYSIZE(FONT_MEDIUM) * 3);
+    MenuSetUserPointer(data->menu, data);
+    AttachWidget(gui, data->menu, MENU_WIDGET_ID, ma);
+
+    memcpy(&METHODS, gui->methods, sizeof(GUI_METHODS));
+    METHODS.onRedraw = OnRedraw;
+    gui->methods = &METHODS;
 
     return CreateGUI(gui);
 }
