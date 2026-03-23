@@ -63,13 +63,14 @@ static void OnRedraw(GUI *gui) {
     CreateLocalWS(&ws, wsbody, 128);
     CreateLocalWS(&ws2, wsbody2, 128);
 
+    const int screen_w = ScreenW();
     const TZ_EXTENDED *tz = &(data->pools[data->pool_id][data->city_id]);
 
     int x = 0, x2 = 0;
     int y = YDISP, y2 = 0;
-    int x_bg = -240 + 60 + (data->pool_id * -1) * 5;
+    int x_bg = -screen_w + 60 + (data->pool_id * -1) * 5;
     int x_bg2 = 60 + (data->pool_id * -1) * 5;
-    int x_bg3 = 60 + 240 + (data->pool_id * -1) * 5;
+    int x_bg3 = 60 + screen_w + (data->pool_id * -1) * 5;
     DrawImg(x_bg, y, ICON_MAP);
     DrawImg(x_bg2, y, ICON_MAP);
     DrawImg(x_bg3, y, ICON_MAP);
@@ -83,9 +84,9 @@ static void OnRedraw(GUI *gui) {
     DrawImg(x, y, pic);
 
     x = gui->canvas->x; x2 = gui->canvas->x2;
-    y += GetImgHeight(ICON_MAP); y2 = y + GetFontYSIZE(FONT_SMALL) + 1;
-    DrawRectangle(x, y, x2, y2, 0,
-                 GetPaletteAdrByColorIndex(PC_FOREGROUND), GetPaletteAdrByColorIndex(PC_FOREGROUND));
+    y += GetImgHeight(ICON_MAP); y2 = y + GetFontYSIZE(FONT_SMALL);
+    DrawRectangle(x, y, x2, y2 + 1, 0,
+        GetPaletteAdrByColorIndex(0), GetPaletteAdrByColorIndex(0));
 
     x = 3; x2 = x2 - 3;
     strncpy(str, tz->tz.gmt + 3, 6);
@@ -95,8 +96,8 @@ static void OnRedraw(GUI *gui) {
     GetCityTime(&date, &time, tz->id, &city_time);
     GetTime_ws(&ws2, &city_time, 0x223);
     wsprintf(&ws, "UTC%s%c%w%c", str, UTF16_ALIGN_RIGHT, &ws2, UTF16_ALIGN_NONE);
-    DrawString(&ws, x, y, x2, y2, FONT_SMALL, 0,
-           GetPaletteAdrByColorIndex(PC_BACKGROUND), GetPaletteAdrByColorIndex(0x17));
+    DrawString(&ws, x, y + 1, x2, y2, FONT_SMALL, 0,
+        GetPaletteAdrByColorIndex(1), GetPaletteAdrByColorIndex(0x17));
 
     TVIEW_DESC *desc = gui->definition;
     if (desc->global_hook_proc) {
@@ -115,7 +116,7 @@ static int OnKey(GUI *gui, GUI_MSG *msg) {
         return 1;
     }
     else if (msg->keys == 0x18) {
-        TZ_EXTENDED *tz = &(data->pools[data->pool_id][data->city_id]);
+        const TZ_EXTENDED *tz = &(data->pools[data->pool_id][data->city_id]);
         SetTimeZone(tz->id);
         data->current_city = tz->tz.city_id;
         WriteCurrentCity(data->current_city);
@@ -237,8 +238,8 @@ static MENU_DESC MENU_D = {
     0,
 };
 
-int CreateUI(TZ_EXTENDED **pools, size_t pools_size, int current_city) {
-    RECT *main_area_rect = GetMainAreaRECT();
+int CreateUI(TZ_EXTENDED **pools, int pools_size, int current_city) {
+    const RECT *main_area_rect = GetMainAreaRECT();
 
     memcpy(&(TVIEW_D.rc), main_area_rect, sizeof(RECT));
 
@@ -260,9 +261,20 @@ int CreateUI(TZ_EXTENDED **pools, size_t pools_size, int current_city) {
 
     data->menu = GetMenuGUI(ma, mf);
     SetMenuToGUI(data->menu, &MENU_D);
-    int y = YDISP + GetImgHeight(ICON_MAP) + GetFontYSIZE(FONT_SMALL);
-    SetWidgetRect(data->menu, main_area_rect->x, y + GetFontYSIZE(FONT_MEDIUM) / 3,
-                main_area_rect->x2, y - GetFontYSIZE(FONT_MEDIUM) * 3);
+
+    int y_menu = 0;
+    int y2_menu = 0;
+    const int y = YDISP + GetImgHeight(ICON_MAP) + GetFontYSIZE(FONT_SMALL);
+#ifdef NEWSGOLD
+#ifdef ELKA
+    y_menu = y + GetFontYSIZE(FONT_MEDIUM) / 3;
+    y2_menu = y - GetFontYSIZE(FONT_MEDIUM) * 3;
+#else
+    y_menu = y + 6;
+    y2_menu = y - 18;
+#endif
+#endif
+    SetWidgetRect(data->menu, main_area_rect->x, y_menu, main_area_rect->x2, y2_menu);
     MenuSetUserPointer(data->menu, data);
     AttachWidget(gui, data->menu, MENU_WIDGET_ID, ma);
 

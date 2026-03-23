@@ -12,3 +12,7 @@ add_executable(TimeZonePicker_ELKA ${SOURCES})
 target_sdk_setup(TimeZonePicker_ELKA ELKA)
 target_compile_options(TimeZonePicker_ELKA BEFORE PUBLIC -std=c11 -Wall -Werror)
 set_target_properties(TimeZonePicker_ELKA PROPERTIES OUTPUT_NAME "TimeZonePicker")
+
+add_executable(TimeZonePicker_NSG ${SOURCES})
+target_sdk_setup(TimeZonePicker_NSG NSG)
+target_compile_options(TimeZonePicker_NSG BEFORE PUBLIC -std=c11 -Wall -Werror)
