@@ -26,39 +26,61 @@ int ComparePools(const void *tz1, const void *tz2) {
     return wstrcmp(&ws1, &ws2);
 }
 
-void AddElementToPool(TZ_EXTENDED ***pools, int *pools_size, TZ_EXTENDED **pool, int pool_size) {
-    (*pool)[pool_size].id = -1;
-    *pool = realloc(*pool, sizeof(TZ_EXTENDED) * (pool_size + 1));
-    qsort(*pool, pool_size, sizeof(TZ_EXTENDED), ComparePools);
+int AddElementToPool(TZ_EXTENDED **pool, const TZ *tz, int *pool_size) {
+    int size = *pool_size;
+    TZ_EXTENDED *new_pool = realloc(*pool, sizeof(TZ_EXTENDED) * (size + 2));
+    if (!new_pool) {
+        return 0;
+    }
+    TZ_EXTENDED *p = NULL;
+    p = &(new_pool[size]);
+    memcpy(p, tz, sizeof(TZ));
+    p->id = GetTimeZoneByGMT(p->tz.gmt);
+    size++;
+    p = &(new_pool)[size];
+    p->id = -1;
+    *pool = new_pool;
+    *pool_size = size;
+    return 1;
+}
 
-    (*pools_size)++;
-    *pools = realloc(*pools, sizeof(TZ_EXTENDED*) * (*pools_size));
-    (*pools)[*pools_size - 1] = *pool;
+void FinalizePool(TZ_EXTENDED ***pools, int *pools_size, TZ_EXTENDED **pool, int *pool_size) {
+    int size = *pools_size;
+    TZ_EXTENDED **new_pools = realloc(*pools, sizeof(TZ_EXTENDED*) * (size + 1));
+    if (new_pools) {
+        qsort(*pool, *pool_size, sizeof(TZ_EXTENDED), ComparePools);
+        new_pools[size] = *pool;
+        size++;
+        *pools = new_pools;
+        *pools_size = size;
+    } else {
+        mfree(*pool);
+    }
+    *pool = NULL;
+    *pool_size = 0;
 }
 
 int GetPools(TZ_EXTENDED ***pools) {
+    TZ *tz = RamTimeZones();
+
     int pools_size = 0;
     int pool_size = 0;
-    TZ *tz = RamTimeZones();
-    TZ_EXTENDED *pool = malloc(sizeof(TZ_EXTENDED) * 0xFF);
+    TZ_EXTENDED *pool = NULL;
     while (tz->gmt) {
-        TZ_EXTENDED *p = &(pool[pool_size]);
-        memcpy(p, tz, sizeof(TZ));
-        p->id = GetTimeZoneByGMT(p->tz.gmt);
-        pool_size++;
-
-        TZ *next = tz + 1;
-        if (next->gmt) {
-            if (strncmp(tz->gmt, next->gmt, 8) != 0) {
-                AddElementToPool(pools, &pools_size, &pool, pool_size);
-                pool_size = 0;
-                pool = malloc(sizeof(TZ_EXTENDED) * 0xFF);
+        if (AddElementToPool(&pool, tz, &pool_size)) {
+            TZ *next = tz + 1;
+            if (next->gmt) {
+                if (strncmp(tz->gmt, next->gmt, 8) != 0) {
+                    FinalizePool(pools, &pools_size, &pool, &pool_size);
+                }
+            } else {
+                FinalizePool(pools, &pools_size, &pool, &pool_size);
             }
-        } else {
-            AddElementToPool(pools, &pools_size, &pool, pool_size);
-            pool_size = 0;
         }
         tz++;
+    }
+    if (pool_size > 0) {
+        FinalizePool(pools, &pools_size, &pool, &pool_size);
     }
     return pools_size;
 }
@@ -80,7 +102,7 @@ static void OnClose(CSM_RAM *data) {
         mfree(csm->pools[i]);
     }
     mfree(csm->pools);
-    SUBPROC((void *)kill_elf);
+    SUBPROC(kill_elf);
 }
 
 static int OnMessage(CSM_RAM *data, GBS_MSG *msg) {
@@ -124,7 +146,7 @@ void UpdateCSMname(void) {
 }
 
 int main() {
-    MAIN_CSM main_csm;
+    MAIN_CSM main_csm = { 0 };
     LockSched();
     UpdateCSMname();
     CreateCSM(&MAINCSM.maincsm, &main_csm, 0);

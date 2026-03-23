@@ -237,7 +237,7 @@ static MENU_DESC MENU_D = {
     0,
 };
 
-int CreateUI(TZ_EXTENDED **pools, int pools_size, int current_city) {
+int CreateUI(TZ_EXTENDED **pools, size_t pools_size, int current_city) {
     RECT *main_area_rect = GetMainAreaRECT();
 
     memcpy(&(TVIEW_D.rc), main_area_rect, sizeof(RECT));
@@ -261,7 +261,7 @@ int CreateUI(TZ_EXTENDED **pools, int pools_size, int current_city) {
     data->menu = GetMenuGUI(ma, mf);
     SetMenuToGUI(data->menu, &MENU_D);
     int y = YDISP + GetImgHeight(ICON_MAP) + GetFontYSIZE(FONT_SMALL);
-    SetMenuRect(data->menu, main_area_rect->x, y + GetFontYSIZE(FONT_MEDIUM) / 3,
+    SetWidgetRect(data->menu, main_area_rect->x, y + GetFontYSIZE(FONT_MEDIUM) / 3,
                 main_area_rect->x2, y - GetFontYSIZE(FONT_MEDIUM) * 3);
     MenuSetUserPointer(data->menu, data);
     AttachWidget(gui, data->menu, MENU_WIDGET_ID, ma);
