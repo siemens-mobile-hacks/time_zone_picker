@@ -84,8 +84,8 @@ static void OnRedraw(GUI *gui) {
     DrawImg(x, y, pic);
 
     x = gui->canvas->x; x2 = gui->canvas->x2;
-    y += GetImgHeight(ICON_MAP); y2 = y + GetFontYSIZE(FONT_SMALL);
-    DrawRectangle(x, y, x2, y2 + 1, 0,
+    y += GetImgHeight(ICON_MAP); y2 = y + GetFontYSIZE(FONT_SMALL) + 2;
+    DrawRectangle(x, y, x2, y2, 0,
         GetPaletteAdrByColorIndex(0), GetPaletteAdrByColorIndex(0));
 
     x = 3; x2 = x2 - 3;
@@ -96,6 +96,9 @@ static void OnRedraw(GUI *gui) {
     GetCityTime(&date, &time, tz->id, &city_time);
     GetTime_ws(&ws2, &city_time, 0x223);
     wsprintf(&ws, "UTC%s%c%w%c", str, UTF16_ALIGN_RIGHT, &ws2, UTF16_ALIGN_NONE);
+#ifndef ELKA
+    y +=1;
+#endif
     DrawString(&ws, x, y + 1, x2, y2, FONT_SMALL, 0,
         GetPaletteAdrByColorIndex(1), GetPaletteAdrByColorIndex(0x17));
 
@@ -265,14 +268,12 @@ int CreateUI(TZ_EXTENDED **pools, int pools_size, int current_city) {
     int y_menu = 0;
     int y2_menu = 0;
     const int y = YDISP + GetImgHeight(ICON_MAP) + GetFontYSIZE(FONT_SMALL);
-#ifdef NEWSGOLD
-#ifdef ELKA
-    y_menu = y + GetFontYSIZE(FONT_MEDIUM) / 3;
-    y2_menu = y - GetFontYSIZE(FONT_MEDIUM) * 3;
-#else
+#ifndef ELKA
     y_menu = y + 6;
     y2_menu = y - 18;
-#endif
+#else
+    y_menu = y + GetFontYSIZE(FONT_MEDIUM) / 3;
+    y2_menu = y - GetFontYSIZE(FONT_MEDIUM) * 3;
 #endif
     SetWidgetRect(data->menu, main_area_rect->x, y_menu, main_area_rect->x2, y2_menu);
     MenuSetUserPointer(data->menu, data);
